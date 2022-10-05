@@ -1,6 +1,6 @@
 # UdpHolepunchTest
 
-Testing UDP hole punching for @tivolispace
+Testing UDP hole punching for https://github.com/tivolispace/tivolispace/
 
 Host can connect to multiple clients, whilst client can only connect to one host
 
