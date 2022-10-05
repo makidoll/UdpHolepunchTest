@@ -48,15 +48,10 @@ while True:
         try:
             split = message.split(b' ')
             instance_id = split[1].decode("utf-8")
-            print("new host for " + instance_id + " " + str(address))
+            local_ip = split[2].decode("utf-8")
+            print("new host for " + instance_id + " " + str(address) + " local ip " + local_ip)
 
-            hosts[instance_id] = address
-
-#             print("> sending host, host info...")
-#             socket.sendto(
-#                 address_to_bytes(address),
-#                 address,
-#             )
+            hosts[instance_id] = [address, local_ip]
 
         except Exception as e:
             print("error: host failed")
@@ -67,23 +62,33 @@ while True:
         try:
             split = message.split(b' ')
             instance_id = split[1].decode("utf-8")
-            print("new client for " + instance_id + " " + str(address))
+            local_ip = split[2].decode("utf-8")
+            print("new client for " + instance_id + " " + str(address) + " local ip " + local_ip)
 
-#             print("> sending client, client info...")
-#             socket.sendto(
-#                 address_to_bytes(address),
-#                 address,
-#             )
+            host_address = hosts[instance_id][0]
+            host_local_ip = hosts[instance_id][1]
+            
+            address_to_send_to_client = host_address
+            address_to_send_to_host = address
+            
+            print(address_to_send_to_client)
+            
+            if host_address[0] == address[0]:
+                print("> same network! sending local ips instead") 
+                address_to_send_to_client = (host_local_ip, host_address[1])
+                address_to_send_to_host = (local_ip, address[1])
+                
+                print(address_to_send_to_client)
 
             print("> sending host, client info...")
             socket.sendto(
-                address_to_bytes(address),
-                hosts[instance_id],
+                address_to_bytes(address_to_send_to_host),
+                host_address,
             )
 
             print("> sending client, host info...")
             socket.sendto(
-                address_to_bytes(hosts[instance_id]),
+                address_to_bytes(address_to_send_to_client),
                 address,
             )
 

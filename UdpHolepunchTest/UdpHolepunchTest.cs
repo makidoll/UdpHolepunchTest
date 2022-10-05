@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -11,6 +12,7 @@ namespace UdpHolepunchTest
     {
         // private readonly IPEndPoint _holepunchServer = new(Dns.GetHostAddresses("tivoli.space")[0], 5971);
         private readonly IPEndPoint _holepunchServer = new(IPAddress.Parse("142.93.250.50"), 5971);
+        // private readonly IPEndPoint _holepunchServer = new(IPAddress.Parse("127.0.0.1"), 5971);
 
         private bool _hosting;
         private string _instanceId;
@@ -32,6 +34,8 @@ namespace UdpHolepunchTest
                 Environment.Exit(1);
             }
 
+            Console.WriteLine(GetLocalIpAddress());
+
             _hosting = args[0] == "host";
             _instanceId = args[1];
 
@@ -52,31 +56,52 @@ namespace UdpHolepunchTest
             heartbeatTimer.Elapsed += Heartbeat;
             heartbeatTimer.Interval = 1000;
             heartbeatTimer.Start();
-            
-            ReceiveLoop(_holepunchServer, data =>
+
+            Task.Run(async () =>
             {
-                var ipAndPort = Encoding.UTF8.GetString(data).Split(' ');
-                var peerEndpoint = new IPEndPoint(IPAddress.Parse(ipAndPort[0]), int.Parse(ipAndPort[1]));
-                
-                if (_hosting)
+                var buffer = new byte[0x10000];
+                while (true)
                 {
-                    Console.WriteLine("new client: " + peerEndpoint);
+                    // idk doesnt work
+                    // var result = await _udpClient.Client.ReceiveFromAsync(buffer, SocketFlags.None, address);
+                    var result = await _udpClient.ReceiveAsync();
+                    if (Equals(result.RemoteEndPoint, _holepunchServer))
+                    {
+                        FromHolepunchServer(result.Buffer);
+                    }
+                    else
+                    {
+                        FromPeer(result.Buffer);
+                    }
                 }
-                else
-                {
-                    Console.WriteLine("new host: " + peerEndpoint);
-                }
-
-                Console.WriteLine("listening and writing to: " + peerEndpoint);
-
-                ReceiveLoop(peerEndpoint,
-                    peerData => { Console.WriteLine("got data! " + Encoding.UTF8.GetString(peerData)); });
-
-                KeepSendingTestMessagesToPeer(peerEndpoint);
             });
 
             Console.WriteLine("press enter to close");
             Console.ReadLine();
+        }
+
+        private void FromHolepunchServer(byte[] data)
+        {
+            var ipAndPort = Encoding.UTF8.GetString(data).Split(' ');
+            var peerEndpoint = new IPEndPoint(IPAddress.Parse(ipAndPort[0]), int.Parse(ipAndPort[1]));
+
+            if (_hosting)
+            {
+                Console.WriteLine("new client: " + peerEndpoint);
+            }
+            else
+            {
+                Console.WriteLine("new host: " + peerEndpoint);
+            }
+
+            Console.WriteLine("listening and writing to: " + peerEndpoint);
+            
+            KeepSendingTestMessagesToPeer(peerEndpoint);
+        }
+
+        private void FromPeer(byte[] data)
+        {
+            Console.WriteLine("got data from peer! " + Encoding.UTF8.GetString(data));
         }
 
         private void KeepSendingTestMessagesToPeer(IPEndPoint peerEndpoint)
@@ -85,36 +110,35 @@ namespace UdpHolepunchTest
             peerTimer.Elapsed += async (_, _) =>
             {
                 // Console.WriteLine("sending message to: " + peerEndpoint);
-                var message = Encoding.UTF8.GetBytes("yay hi how are you! msg " + _incrementingNumberForTestMessages);
+                var message = Encoding.UTF8.GetBytes("yay " + _incrementingNumberForTestMessages);
                 await _udpClient.SendAsync(message, message.Length, peerEndpoint);
                 _incrementingNumberForTestMessages++;
             };
-            peerTimer.Interval = 200;
+            peerTimer.Interval = 250;
             peerTimer.Start();
         }
 
-        private void ReceiveLoop(IPEndPoint address, Action<byte[]> onData)
+        private static string GetLocalIpAddress()
         {
-            _udpClient.BeginReceive(asyncResult =>
-            {
-                var receiveAddress = address;
-                var result = _udpClient.EndReceive(asyncResult, ref receiveAddress);
-                onData.Invoke(result);
-                ReceiveLoop(address, onData);
-            }, null);
+            using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
+            socket.Connect("8.8.8.8", 65530);
+            var endPoint = socket.LocalEndPoint as IPEndPoint;
+            return endPoint?.Address.ToString();
         }
-        
+
         private async Task StartHost()
         {
             Console.WriteLine("start host");
-            var message = Encoding.UTF8.GetBytes("host " + _instanceId);
+            var localIp = GetLocalIpAddress();
+            var message = Encoding.UTF8.GetBytes("host " + _instanceId + " " + localIp);
             await _udpClient.SendAsync(message, message.Length, _holepunchServer);
         }
 
         private async Task StartClient()
         {
             Console.WriteLine("start client");
-            var message = Encoding.UTF8.GetBytes("client " + _instanceId);
+            var localIp = GetLocalIpAddress();
+            var message = Encoding.UTF8.GetBytes("client " + _instanceId + " " + localIp);
             await _udpClient.SendAsync(message, message.Length, _holepunchServer);
         }
 

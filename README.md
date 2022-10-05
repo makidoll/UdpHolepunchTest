@@ -14,8 +14,6 @@ Host can connect to multiple clients, whilst client can only connect to one host
 
 ## Todo
 
-- Handle connections on the same local network
-
 - Add relay system
 
 ## Observations
