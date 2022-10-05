@@ -16,6 +16,8 @@ Host can connect to multiple clients, whilst client can only connect to one host
 
 - Add relay system
 
+- If host/client IP is default gateway, then get server's public IP
+
 ## Observations
 
 - Cellular network does not work. Should it? Using a VPN is a good way to test for now.
