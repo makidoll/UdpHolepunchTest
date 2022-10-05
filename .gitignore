@@ -1,0 +1,6 @@
+.DS_Store
+*.DotSettings.user
+*.DotSettings
+.idea
+UdpHolepunchTest/bin
+UdpHolepunchTest/obj
